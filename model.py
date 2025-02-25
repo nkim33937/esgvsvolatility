@@ -1,23 +1,16 @@
 import pandas as pd
 import numpy as np
 import cvxpy as cp
-
+import yfinance as yf
 
 esg_data = pd.read_csv("data.csv")  # replaced with whatever the ESG data path, but #this is the kaggle data from link above
 esg_data_og = esg_data[["ticker", "total_score"]].dropna(subset=["total_score"])
 esg_data_og.rename(columns={"ticker": "Ticker", "total_score": "ESG_Score"}, inplace=True)
 esg_data_og["Ticker"] = esg_data_og["Ticker"].str.upper()
 
-
-import yfinance as yf
-
-
-
-
 # this is the historical prices data
 start_date = "2018-01-01"
 end_date = "2023-01-01"
-
 
 tickers = [
    "AAPL", "ABBV", "ABT", "ACN", "ADBE", "AIG", "AMGN", "AMT", "AMZN",
@@ -32,19 +25,13 @@ tickers = [
    "TGT", "TMO", "TMUS", "TRV", "TXN", "UNH", "UNP", "UPS", "USB", "V",
    "VZ", "WBA", "WFC", "WMT", "XOM"
 ]
-
-
+# pandas and yfinance data analysis and jargon.
 data = yf.download(tickers, start=start_date, end=end_date)
 prices = data.xs("Close", axis=1, level=0)
 prices = prices.dropna(axis=1, how="all")
 
-
-
-
 all_price_tickers = prices.columns
 all_esg_tickers = esg_data_og["Ticker"].unique()
-
-
 
 
 print("All Price Tickers:", all_price_tickers)
@@ -55,27 +42,15 @@ valid_tickers = [t for t in all_esg_tickers if t in all_price_tickers]
 esg_data_filtered = esg_data_og[esg_data_og["Ticker"].isin(valid_tickers)]
 esg_data_filtered = esg_data_filtered.set_index("Ticker")
 
-
-
-
 prices = prices[valid_tickers]
-
-
-
 
 returns = prices.pct_change().dropna()
 mean_returns = returns.mean()
 cov_matrix = returns.cov()
 
-
-
-
 esg_scores = esg_data_filtered["ESG_Score"]
 esg_min, esg_max = esg_scores.min(), esg_scores.max()
 normalized_esg = (esg_scores - esg_min) / (esg_max - esg_min)
-
-
-
 
 tickers = valid_tickers 
 N = len(tickers)
@@ -84,10 +59,7 @@ Sigma = cov_matrix.loc[tickers, tickers].values
 ESG = normalized_esg[tickers].values
 
 
-"""
-Everything above was pandas and yfinance data analysis and jargon. Below is building mathematical models used. 
-"""
-
+# Building mathematical models used below.
 def solve_min_variance(Sigma):
    """
    Traditional risk minimization:
@@ -100,7 +72,6 @@ def solve_min_variance(Sigma):
    prob.solve()
    return w.value, prob.value
 
-
 def solve_max_esg(ESG):
    """
    ESG maximization:
@@ -112,7 +83,6 @@ def solve_max_esg(ESG):
    prob = cp.Problem(cp.Maximize(esg_obj), constraints)
    prob.solve()
    return w.value, prob.value
-
 
 def solve_esg_risk_tradeoff(Sigma, ESG, lam):
    """
@@ -128,11 +98,6 @@ def solve_esg_risk_tradeoff(Sigma, ESG, lam):
    prob = cp.Problem(objective, constraints)
    prob.solve()
    return w.value, prob.value
-
-
-
-
-
 
 #results showing
 lambda_values = [0.0, 0.5, 1.0]
